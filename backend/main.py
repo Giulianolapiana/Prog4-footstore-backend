@@ -32,7 +32,7 @@ app = FastAPI(
         "**Stack:** FastAPI + SQLModel + PostgreSQL\n\n"
         "**Parcial 2 — Programación IV · UTN**"
     ),
-    version="5.0.0",
+    version="6.0.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",

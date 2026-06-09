@@ -1,4 +1,3 @@
-# app/modules/pedidos/service.py
 from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlmodel import Session
@@ -145,6 +144,13 @@ class PedidoService:
 
             if estado_actual.codigo in ["ENTREGADO", "CANCELADO"]:
                 raise HTTPException(status_code=400, detail="El pedido ya finalizó su ciclo.")
+
+            # Reponer stock al cancelar el pedido
+            for detalle in pedido.detalles:
+                producto = uow.productos.get_by_id(detalle.producto_id)
+                if producto:
+                    producto.stock_cantidad += detalle.cantidad
+                    uow._session.add(producto)
 
             estado_cancelado = uow.estados.get_by_codigo("CANCELADO")
             pedido.estado_actual_id = estado_cancelado.id

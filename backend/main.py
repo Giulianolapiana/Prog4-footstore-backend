@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.database import create_db_and_tables
 from app.modules.seed.seed import run_seed
+from app.core.cloudinary_setup import init_cloudinary
+from app.modules.images.router import router as router_images
 
 # Routers modulares
 from app.modules.categorias.router import router as router_categorias
@@ -14,14 +16,14 @@ from app.modules.auth.router import router as router_auth
 from app.modules.direcciones.router import router as router_direcciones
 from app.modules.pedidos.router import router as router_pedidos
 from app.modules.admin.router import router as router_admin
+from app.modules.pedidos.ws_router import router as router_ws_pedidos
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. Al arrancar, verificamos/creamos las tablas en PostgreSQL
     create_db_and_tables()
-    # 2. Corremos el seed para inyectar roles, estados y el admin por defecto
     run_seed()
+    init_cloudinary()
     yield
 
 
@@ -62,6 +64,8 @@ app.include_router(router_productos, prefix="/api/v1")
 app.include_router(router_direcciones, prefix="/api/v1")
 app.include_router(router_pedidos, prefix="/api/v1")
 app.include_router(router_admin, prefix="/api/v1")
+app.include_router(router_ws_pedidos)
+app.include_router(router_images, prefix="/api/v1")
 
 #  Manejador de errores de validación de Pydantic 
 # Traduce los mensajes automáticos de FastAPI al español

@@ -17,6 +17,7 @@ from app.modules.direcciones.router import router as router_direcciones
 from app.modules.pedidos.router import router as router_pedidos
 from app.modules.admin.router import router as router_admin
 from app.modules.pedidos.ws_router import router as router_ws_pedidos
+from app.modules.pagos.router import router as router_pagos
 
 
 @asynccontextmanager
@@ -66,6 +67,7 @@ app.include_router(router_pedidos, prefix="/api/v1")
 app.include_router(router_admin, prefix="/api/v1")
 app.include_router(router_ws_pedidos)
 app.include_router(router_images, prefix="/api/v1")
+app.include_router(router_pagos, prefix="/api/v1")
 
 #  Manejador de errores de validación de Pydantic 
 # Traduce los mensajes automáticos de FastAPI al español

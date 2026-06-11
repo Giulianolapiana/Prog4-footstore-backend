@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     cloudinary_api_key: str = ""
     cloudinary_api_secret: str = ""
 
+    MP_ACCESS_TOKEN:  Optional[str] = None
+    MP_PUBLIC_KEY:    Optional[str] = None
+    MP_WEBHOOK_URL:   Optional[str] = None
+    NGROK_URL:        Optional[str] = None
+
 
     @computed_field
     @property

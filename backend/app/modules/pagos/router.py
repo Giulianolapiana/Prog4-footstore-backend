@@ -5,7 +5,7 @@ from sqlmodel import Session
 
 from app.core.config import settings
 from app.core.database import get_session
-from app.core.ws_manager import ws_manager
+from app.core.websocket import ws_manager
 from app.modules.pagos.schemas import (
     CrearPagoRequest,
     ConfirmarPagoRequest,
@@ -14,6 +14,7 @@ from app.modules.pagos.schemas import (
 )
 from app.modules.pagos.models import Pago
 from app.modules.pagos.service import PaymentService
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/pagos", tags=["Pasarela MercadoPago"])
@@ -26,7 +27,15 @@ def create_preference(
     data: CrearPagoRequest,
     svc: PaymentService = Depends(get_payment_service),
 ):
-    return svc.crear_pago(data.pedido_id)
+    try:
+        return svc.crear_pago(data.pedido_id)
+    except ValueError as e:
+        if "no encontrado" in str(e).lower():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except RuntimeError as e:
+        # Errores de la SDK de MP
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 @router.post("/webhook")
 async def webhook(
@@ -61,21 +70,29 @@ async def confirm_payment(
     data: ConfirmarPagoRequest,
     svc: PaymentService = Depends(get_payment_service),
 ):
-    res, pedido_id = svc.confirmar_pago(data.pedido_id, data.payment_id)
-    
-    if res.estado == "aprobado" and pedido_id:
-        await ws_manager.broadcast_pedido_update(
-            pedido_id=pedido_id,
-            usuario_id=None,
-            evento="pago_confirmado",
-            estado_nuevo="CONFIRMADO",
-            estado_anterior="PENDIENTE"
-        )
-    return res
+    try:
+        res, pedido_id = svc.confirmar_pago(data.pedido_id, data.payment_id)
+        
+        if res.estado == "aprobado" and pedido_id:
+            await ws_manager.broadcast_pedido_update(
+                pedido_id=pedido_id,
+                usuario_id=None,
+                evento="pago_confirmado",
+                estado_nuevo="CONFIRMADO",
+                estado_anterior="PENDIENTE"
+            )
+        return res
+    except ValueError as e:
+        if "no encontrado" in str(e).lower():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
 
 @router.get("/redirect/{pedido_id}/{status_mp}")
 async def redirect_after_pago(pedido_id: int, status_mp: str, request: Request):
-    frontend_url = settings.VITE_FRONTEND_URL or "http://localhost:5174" # Puerto del Store público
+    frontend_url = settings.VITE_FRONTEND_URL
     qs = request.url.query
     url = f"{frontend_url}/orders/{pedido_id}/{status_mp}"
     if qs:

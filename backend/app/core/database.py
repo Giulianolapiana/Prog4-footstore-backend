@@ -17,7 +17,7 @@ def create_db_and_tables() -> None:
         import app.modules.ingredientes.models  # noqa: F401
         import app.modules.direcciones.models   # noqa: F401
         import app.modules.pedidos.models       # noqa: F401
-        import app.modules.admin.models         # noqa: F401
+        #import app.modules.admin.models         # noqa: F401
         import app.modules.images.models        # noqa: F401
         import app.modules.pagos.models         # noqa: F401
         

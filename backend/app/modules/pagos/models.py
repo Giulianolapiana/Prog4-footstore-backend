@@ -1,4 +1,3 @@
-# app/modules/pagos/models.py
 from typing import Optional
 from datetime import datetime, timezone
 from sqlmodel import SQLModel, Field
@@ -10,7 +9,7 @@ class Pago(SQLModel, table=True):
 
     # ── Datos locales del pago ──────────────────────────────────────────────
     id: Optional[int] = Field(default=None, primary_key=True)
-    pedido_id: int = Field(foreign_key="pedidos.id", index=True)
+    pedido_id: int = Field(foreign_key="pedido.id", index=True)
     monto: float = Field(ge=0)
 
     # Estado local: "pendiente" | "aprobado" | "rechazado"

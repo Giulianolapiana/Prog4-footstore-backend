@@ -1,9 +1,8 @@
 import uuid
 import logging
+import mercadopago
 from datetime import datetime, timezone
 from typing import Optional, Tuple
-
-from fastapi import HTTPException, status
 from sqlmodel import Session
 
 from app.core.config import settings
@@ -34,7 +33,6 @@ class PaymentService:
             raise RuntimeError("MercadoPago no está configurado. Configure MP_ACCESS_TOKEN")
 
         try:
-            import mercadopago
             sdk = mercadopago.SDK(access_token)
 
             preference_data = {
@@ -64,9 +62,6 @@ class PaymentService:
                 "preference_id": response.get("id"),
                 "init_point": response.get("init_point"),
             }
-
-        except ImportError:
-            raise RuntimeError("Falta la librería: pip install mercadopago")
         except Exception as e:
             logger.exception("Error inesperado al crear preferencia MP")
             raise RuntimeError(f"Error de conexión con MP: {str(e)}")
@@ -77,7 +72,6 @@ class PaymentService:
             raise RuntimeError("MP no configurado")
 
         try:
-            import mercadopago
             sdk = mercadopago.SDK(access_token)
             result = sdk.payment().get(payment_id)
 
@@ -92,9 +86,6 @@ class PaymentService:
                 "mp_status_detail": response.get("status_detail"),
                 "mp_merchant_order_id": response.get("merchant_order_id"),
             }
-
-        except ImportError:
-            raise RuntimeError("Falta la librería: pip install mercadopago")
         except Exception as e:
             logger.exception("Error consultando pago MP %s", payment_id)
             raise RuntimeError(f"Error de conexión con MP: {str(e)}")
@@ -106,10 +97,10 @@ class PaymentService:
     def crear_pago(self, pedido_id: int) -> PagoCrearResponse:
         pedido = self._session.get(Pedido, pedido_id)
         if not pedido:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido no encontrado")
+            raise ValueError("Pedido no encontrado")
 
         if not self._get_mp_access_token():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MercadoPago no configurado.")
+            raise ValueError("MercadoPago no configurado.")
 
         ngrok_url = settings.NGROK_URL or "http://localhost:8000"
         back_urls = {
@@ -118,15 +109,13 @@ class PaymentService:
             "pending": f"{ngrok_url}/api/v1/pagos/redirect/{pedido_id}/pending",
         }
 
-        try:
-            mp_data = self._crear_preferencia_mp(
-                monto=pedido.total,
-                titulo=f"Pedido #{pedido_id} - FoodStore",
-                pedido_id=pedido_id,
-                back_urls=back_urls,
-            )
-        except RuntimeError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        
+        mp_data = self._crear_preferencia_mp(
+            monto=pedido.total,
+            titulo=f"Pedido #{pedido_id} - FoodStore",
+            pedido_id=pedido_id,
+            back_urls=back_urls,
+        )
 
         with PagoUnitOfWork(self._session) as uow:
             pago = Pago(
@@ -138,7 +127,7 @@ class PaymentService:
                 idempotency_key=str(uuid.uuid4()),
             )
             uow.pagos.add(pago)
-            uow._session.flush() # Importante para obtener el ID asignado por la BD
+            uow.flush() # Importante para obtener el ID asignado por la BD
 
             return PagoCrearResponse(
                 pago_id=pago.id,
@@ -221,7 +210,7 @@ class PaymentService:
     def confirmar_pago(self, pedido_id: int, payment_id: Optional[int] = None) -> Tuple[PagoEstadoResponse, Optional[int]]:
         pedido = self._session.get(Pedido, pedido_id)
         if not pedido:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido no encontrado")
+            raise ValueError("Pedido no encontrado")
 
         resolved_payment_id = payment_id
         if not resolved_payment_id:
@@ -231,10 +220,7 @@ class PaymentService:
                     resolved_payment_id = pago_local.mp_payment_id
 
         if resolved_payment_id:
-            try:
-                mp_info = self._consultar_pago_mp(resolved_payment_id)
-            except RuntimeError as e:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+            mp_info = self._consultar_pago_mp(resolved_payment_id)
 
             estado_mp = mp_info.get("mp_status")
             if estado_mp == "approved":

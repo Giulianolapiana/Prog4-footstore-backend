@@ -98,7 +98,7 @@ POSTGRES_DB=sistema_pedidos
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5433
 
-SECRET_KEY=una_clave_larga_segura
+SECRET_KEY=
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
@@ -245,4 +245,3 @@ Si cambias puertos o dominios, actualizalo en `backend/main.py`.
 - Este backend sigue el enfoque feature-first y la base de arquitectura del documento.
 - La especificacion del TPI incluye ademas integracion de pagos y uploads avanzados; esta version documenta lo que esta presente en este repo actualmente.
 - Si se agregan nuevos modulos (por ejemplo pagos MercadoPago dedicados), actualizar este README para mantener trazabilidad con la entrega.
-

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Cookie
 from jose import jwt, JWTError
 from app.core.config import settings
 from app.core.websocket import ws_manager
@@ -6,11 +6,16 @@ from app.core.websocket import ws_manager
 router = APIRouter(tags=["WebSocket Pedidos"])
 
 @router.websocket("/ws/pedidos")
-async def websocket_pedidos(websocket: WebSocket, token: str = Query(...)):
+async def websocket_pedidos(websocket: WebSocket, access_token: str | None = Cookie(default=None)):
     canal = None
+    
+    if not access_token:
+        await websocket.close(code=1008)
+        return
+        
     try:
         #  Validar el token manualmente 
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(access_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         # sub puede ser email o id
         usuario_id = payload.get("id") or payload.get("sub") 
         roles = payload.get("roles", [])

@@ -29,11 +29,11 @@ class HistorialEstadoPedido(SQLModel, table=True):
     __tablename__ = "historial_estado_pedido"
     id: Optional[int] = Field(default=None, primary_key=True)
     pedido_id: int = Field(foreign_key="pedido.id")
-    estado_id: int = Field(foreign_key="estado_pedido.id")
+    estado_desde: Optional[str] = Field(default=None, foreign_key="estado_pedido.codigo")
+    estado_hacia: str = Field(foreign_key="estado_pedido.codigo")
     usuario_id: int = Field(foreign_key="usuario.id")
-    fecha: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    estado: EstadoPedido = Relationship()
     pedido: "Pedido" = Relationship(back_populates="historial_estados")
 
 class DetallePedido(BaseEntity, table=True):

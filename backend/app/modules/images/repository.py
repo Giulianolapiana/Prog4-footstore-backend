@@ -1,8 +1,11 @@
-from sqlmodel import select
+from sqlmodel import Session, select
 from app.core.repository import BaseRepository
 from app.modules.images.models import ImageEntity
 
 class ImageRepository(BaseRepository[ImageEntity]):
+    
+    def __init__(self, session: Session) -> None:
+        super().__init__(session, ImageEntity)
     
     def get_all_ordered(self) -> list[ImageEntity]:
         """Devuelve las imágenes ordenadas de la más nueva a la más vieja"""

@@ -1,4 +1,5 @@
 from sqlmodel import Session, select, func, cast, String
+from sqlalchemy import Date
 from datetime import date
 from typing import List, Tuple, Optional
 from decimal import Decimal
@@ -12,13 +13,13 @@ class EstadisticasRepository:
     def get_ventas_periodo(self, desde: date, hasta: date, agrupacion: str) -> List[Tuple]:
         stmt = (
             select(
-                DetallePedido.producto_nombre,
-                func.sum(DetallePedido.subtotal_snap).label("ingresos"), 
-                func.sum(DetallePedido.cantidad).label("cantidad_vendida")
+                cast(func.date_trunc(agrupacion, Pedido.created_at), String).label("periodo"),
+                func.sum(Pedido.total).label("total_ventas"),
+                func.count(Pedido.id).label("cantidad_pedidos")
             )
             .join(EstadoPedido, Pedido.estado_actual_id == EstadoPedido.id)
             .where(EstadoPedido.codigo != "CANCELADO")
-            .where(cast(Pedido.created_at, date).between(desde, hasta))
+            .where(cast(Pedido.created_at, Date).between(desde, hasta))
             .group_by("periodo")
             .order_by("periodo")
         )
@@ -59,7 +60,7 @@ class EstadisticasRepository:
             .join(EstadoPedido, EstadoPedido.id == Pedido.estado_actual_id)
             .outerjoin(Pago, Pago.pedido_id == Pedido.id)
             .where(EstadoPedido.codigo != "CANCELADO")
-            .where(cast(Pedido.created_at, date).between(desde, hasta))
+            .where(cast(Pedido.created_at, Date).between(desde, hasta))
             .where(
                 (Pago.mp_status == "approved") | (FormaPago.codigo == "EFECTIVO") | (Pago.estado == "aprobado")
             )
@@ -75,7 +76,7 @@ class EstadisticasRepository:
             select(func.sum(Pedido.total))
             .join(EstadoPedido, Pedido.estado_actual_id == EstadoPedido.id)
             .where(EstadoPedido.codigo != "CANCELADO")
-            .where(cast(Pedido.created_at, date) == hoy)
+            .where(cast(Pedido.created_at, Date) == hoy)
         ).first() or Decimal('0.00')
 
         ticket_prom = self.session.exec(
@@ -94,7 +95,7 @@ class EstadisticasRepository:
             select(func.sum(Pedido.total))
             .join(EstadoPedido, Pedido.estado_actual_id == EstadoPedido.id)
             .where(EstadoPedido.codigo != "CANCELADO")
-            .where(cast(Pedido.created_at, date) >= inicio_mes)
+            .where(cast(Pedido.created_at, Date) >= inicio_mes)
         ).first() or Decimal('0.00')
 
         return (ventas_hoy, ticket_prom, pedidos_activos, ventas_mes)

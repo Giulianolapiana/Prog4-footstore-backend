@@ -5,7 +5,7 @@ from app.modules.pagos.models import Pago
 
 class PagoRepository(BaseRepository[Pago]):
     def __init__(self, session):
-        super().__init__(session)
+        super().__init__(model=Pago, session=session)
 
     def get_by_pedido(self, pedido_id: int) -> List[Pago]:
         """Retorna todos los intentos de pago de un pedido ordenador por fecha desc."""

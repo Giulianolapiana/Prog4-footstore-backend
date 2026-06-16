@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from app.modules.direcciones.schemas import DireccionResponse
 
-# --- SCHEMAS PARA CREACIÓN (Desde el carrito) ---
+# SCHEMAS PARA CREACION Desde el carrito
 class DetallePedidoCreate(BaseModel):
     producto_id: int
     cantidad: int
@@ -17,7 +17,7 @@ class PedidoCreate(BaseModel):
 class AvanzarEstadoRequest(BaseModel):
     estado_codigo: str
 
-# --- SCHEMAS DE RESPUESTA ---
+# SCHEMAS DE RESPUESTA 
 class EstadoPedidoResponse(BaseModel):
     id: int
     codigo: str
@@ -32,9 +32,10 @@ class FormaPagoResponse(BaseModel):
 
 class HistorialEstadoResponse(BaseModel):
     id: int
-    estado: EstadoPedidoResponse
+    estado_desde: Optional[str] = None
+    estado_hacia: str
     usuario_id: int
-    fecha: datetime
+    created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 class DetallePedidoResponse(BaseModel):
@@ -54,8 +55,6 @@ class PedidoResponse(BaseModel):
     estado_actual: EstadoPedidoResponse
     forma_pago: FormaPagoResponse
     direccion_entrega: Optional[DireccionResponse] = None
-    # En el listado a veces no mandamos los detalles para no sobrecargar, 
-    # pero los dejamos opcionales para el endpoint get_by_id
     detalles: Optional[List[DetallePedidoResponse]] = None
     historial_estados: Optional[List[HistorialEstadoResponse]] = None
     

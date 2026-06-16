@@ -72,5 +72,10 @@ class AuthService:
                     detail="El usuario se encuentra deshabilitado"
                 )
 
-            token = create_access_token(data={"sub": usuario.email})
+            roles_codigos = [r.codigo for r in usuario.roles] if hasattr(usuario, 'roles') else []
+            token = create_access_token(data={
+                "sub": usuario.email,
+                "id": usuario.id,
+                "roles": roles_codigos
+            })
             return usuario, token

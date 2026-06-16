@@ -91,7 +91,12 @@ async def confirm_payment(
 
 
 @router.get("/redirect/{pedido_id}/{status_mp}")
-async def redirect_after_pago(pedido_id: int, status_mp: str, request: Request):
+async def redirect_after_pago(
+    pedido_id: int, 
+    status_mp: str, 
+    request: Request,
+    svc: PaymentService = Depends(get_payment_service)
+):
     frontend_url = settings.VITE_FRONTEND_URL
     qs = request.url.query
     
@@ -102,6 +107,24 @@ async def redirect_after_pago(pedido_id: int, status_mp: str, request: Request):
         "pending": "pendiente"
     }
     front_status = status_map.get(status_mp, "error")
+
+    # Si el pago falló o fue cancelado por el usuario, cancelamos el pedido para liberar stock
+    if status_mp == "failure":
+        try:
+            from app.modules.pedidos.service import PedidoService
+            pedido_svc = PedidoService(svc._session)
+            pedido_svc.cancelar_pedido(pedido_id=pedido_id, usuario_id=None, es_cliente=False)
+            
+            # Avisamos por WS que se canceló
+            await ws_manager.broadcast_pedido_update(
+                pedido_id=pedido_id,
+                usuario_id=None,
+                evento="estado_cambiado",
+                estado_nuevo="CANCELADO",
+                estado_anterior="PENDIENTE"
+            )
+        except Exception as e:
+            logger.error(f"Error al auto-cancelar el pedido fallido {pedido_id}: {e}")
     
     url = f"{frontend_url}/pago/{front_status}"
     

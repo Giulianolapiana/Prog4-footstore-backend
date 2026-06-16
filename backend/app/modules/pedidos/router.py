@@ -32,7 +32,7 @@ async def crear_pedido(
     await ws_manager.broadcast_pedido_update(
         pedido_id=pedido.id,
         usuario_id=pedido.usuario_id,
-        evento="estado_cambiado",
+        evento="pedido_creado",
         estado_nuevo="PENDIENTE"
     )
     

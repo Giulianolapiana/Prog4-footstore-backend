@@ -94,7 +94,24 @@ async def confirm_payment(
 async def redirect_after_pago(pedido_id: int, status_mp: str, request: Request):
     frontend_url = settings.VITE_FRONTEND_URL
     qs = request.url.query
-    url = f"{frontend_url}/orders/{pedido_id}/{status_mp}"
+    
+    # Mapeo de estados de MercadoPago a los estados del frontend
+    status_map = {
+        "success": "exito",
+        "failure": "error",
+        "pending": "pendiente"
+    }
+    front_status = status_map.get(status_mp, "error")
+    
+    url = f"{frontend_url}/pago/{front_status}"
+    
+    # Asegurar que external_reference esté presente para la confirmación proactiva
     if qs:
-        url += f"?{qs}"
+        if "external_reference" not in qs:
+            url += f"?{qs}&external_reference={pedido_id}"
+        else:
+            url += f"?{qs}"
+    else:
+        url += f"?external_reference={pedido_id}"
+        
     return RedirectResponse(url=url)

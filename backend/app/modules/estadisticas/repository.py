@@ -62,7 +62,9 @@ class EstadisticasRepository:
             .where(EstadoPedido.codigo != "CANCELADO")
             .where(cast(Pedido.created_at, Date).between(desde, hasta))
             .where(
-                (Pago.mp_status == "approved") | (FormaPago.codigo == "EFECTIVO") | (Pago.estado == "aprobado")
+                (Pago.mp_status == "approved") | 
+                (Pago.estado == "aprobado") | 
+                (FormaPago.codigo.in_(["CASH", "CREDIT", "DEBIT"]))
             )
             .group_by(FormaPago.codigo)
         )

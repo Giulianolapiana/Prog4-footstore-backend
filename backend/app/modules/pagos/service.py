@@ -85,6 +85,7 @@ class PaymentService:
                 "mp_status": response.get("status"),
                 "mp_status_detail": response.get("status_detail"),
                 "mp_merchant_order_id": response.get("merchant_order_id"),
+                "mp_external_reference": response.get("external_reference"),
             }
         except Exception as e:
             logger.exception("Error consultando pago MP %s", payment_id)
@@ -156,7 +157,7 @@ class PaymentService:
         if not pago_mp_id:
             return {"status": "ignored", "reason": "No payment ID"}, None
 
-        if topic not in (None, "payment", "merchant_order"):
+        if topic != "payment":
             return {"status": "ignored", "reason": f"Topic: {topic}"}, None
 
         try:
@@ -177,6 +178,14 @@ class PaymentService:
                 
                 if not pago and mp_info.get("mp_merchant_order_id"):
                     pago = uow.pagos.get_by_mp_merchant_order_id(mp_info["mp_merchant_order_id"])
+
+                if not pago and mp_info.get("mp_external_reference"):
+                    # Si no lo encontramos por ID de MP, lo buscamos por el ID de nuestro pedido (external_reference)
+                    try:
+                        pedido_id_ext = int(mp_info["mp_external_reference"])
+                        pago = uow.pagos.get_ultimo_by_pedido(pedido_id_ext)
+                    except (ValueError, TypeError):
+                        pass
 
                 if not pago:
                     return {"status": "ignored", "reason": "Pago not found in local DB"}, None
@@ -273,6 +282,8 @@ class PaymentService:
 
         estado_confirmado = uow.estados.get_by_codigo("CONFIRMADO")
         if estado_confirmado:
+            estado_anterior_codigo = estado_actual.codigo if estado_actual else "PENDIENTE"
+            
             # 1. Actualiza la cabecera
             pedido.estado_actual_id = estado_confirmado.id
             pedido.updated_at = datetime.now(timezone.utc)
@@ -281,8 +292,7 @@ class PaymentService:
             # 2. Audit trail append-only (Obligatorio en v6.0)
             uow.historiales.add(HistorialEstadoPedido(
                 pedido_id=pedido.id,
-                estado_id=estado_confirmado.id,
-                # Asumimos que el usuario que realizó la acción original es el dueño
-                # o pasamos None porque fue una acción automatizada del sistema.
+                estado_desde=estado_anterior_codigo,
+                estado_hacia="CONFIRMADO",
                 usuario_id=pedido.usuario_id 
             ))

@@ -11,14 +11,18 @@ def create_db_and_tables() -> None:
     # las tablas o ejecutar consultas (evita problemas de orden de import).
     try:
         # Importar módulos que definen modelos (registro de mappers)
-        import app.modules.productos.models  # noqa: F401
-        import app.modules.categorias.models  # noqa: F401
+        import app.modules.auth.models          # noqa: F401
+        import app.modules.productos.models     # noqa: F401
+        import app.modules.categorias.models    # noqa: F401
         import app.modules.ingredientes.models  # noqa: F401
-        import app.modules.usuarios.models  # noqa: F401
-    except Exception:
-        # Ignorar errores de importación aquí: si fallan, create_all puede
-        # igualmente intentarlo y los errores se verán más arriba.
-        pass
+        import app.modules.direcciones.models   # noqa: F401
+        import app.modules.pedidos.models       # noqa: F401
+        #import app.modules.admin.models         # noqa: F401
+        import app.modules.uploads.models        # noqa: F401
+        import app.modules.pagos.models         # noqa: F401
+        
+    except ImportError as e:
+        print(f"Error al importar modelos: {e}")
 
     SQLModel.metadata.create_all(engine)
 

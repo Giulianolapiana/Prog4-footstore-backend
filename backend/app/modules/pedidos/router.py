@@ -5,6 +5,7 @@ from sqlmodel import Session
 
 from app.core.database import get_session
 from app.core.security import AuthenticatedUser
+from app.core.websocket import ws_manager
 from app.modules.auth.dependencies import require_roles, get_current_user
 from app.modules.pedidos.schemas import PedidoCreate, PedidoResponse, AvanzarEstadoRequest
 from app.modules.pedidos.service import PedidoService
@@ -16,15 +17,26 @@ CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_user)]
 
 def get_pedido_service(session: SessionDep) -> PedidoService:
     return PedidoService(session)
-
+#async porque vamos a usar el ws_manager
 @router.post("/", response_model=PedidoResponse, status_code=status.HTTP_201_CREATED)
-def crear_pedido(
+async def crear_pedido(
     data: PedidoCreate,
     current_user: CurrentUser,
     svc: PedidoService = Depends(get_pedido_service),
 ):
     """Crea un pedido desde el carrito. El usuario logueado queda como dueño."""
-    return svc.crear_pedido(usuario_id=current_user.id, data=data)
+    #Ejecuta la lógica de negocio y el commit en la BD
+    pedido = svc.crear_pedido(usuario_id=current_user.id, data=data)
+    
+    #Emite el evento por WebSocket (Fuera del UoW)
+    await ws_manager.broadcast_pedido_update(
+        pedido_id=pedido.id,
+        usuario_id=pedido.usuario_id,
+        evento="estado_cambiado",
+        estado_nuevo="PENDIENTE"
+    )
+    
+    return pedido
 
 @router.get("/", response_model=List[PedidoResponse])
 def listar_pedidos(
@@ -52,17 +64,27 @@ def detalle_pedido(
     return svc.obtener_por_id(pedido_id, current_user.id, es_gestor)
 
 @router.patch("/{pedido_id}/estado", response_model=PedidoResponse)
-def avanzar_estado_pedido(
+async def avanzar_estado_pedido(  # ★ Cambiado a async
     pedido_id: Annotated[int, Path(ge=1)],
     data: AvanzarEstadoRequest,
     svc: PedidoService = Depends(get_pedido_service),
     current_user: AuthenticatedUser = Depends(require_roles("ADMIN", "PEDIDOS"))
 ):
-    """Solo el personal autorizado puede avanzar los pedidos en el tablero Kanban."""
-    return svc.avanzar_estado(pedido_id, data.estado_codigo, current_user.id)
+    """Solo el personal autorizado puede avanzar"""
+    pedido = svc.avanzar_estado(pedido_id, data.estado_codigo, current_user.id)
+    
+    #Avisa en tiempo real
+    await ws_manager.broadcast_pedido_update(
+        pedido_id=pedido.id,
+        usuario_id=pedido.usuario_id,
+        evento="estado_cambiado",
+        estado_nuevo=data.estado_codigo
+    )
+    
+    return pedido
 
 @router.patch("/{pedido_id}/cancelar", response_model=PedidoResponse)
-def cancelar_pedido(
+async def cancelar_pedido(  # ★ Cambiado a async
     pedido_id: Annotated[int, Path(ge=1)],
     current_user: CurrentUser,
     svc: PedidoService = Depends(get_pedido_service),
@@ -71,4 +93,15 @@ def cancelar_pedido(
     Permite cancelar el pedido. El cliente solo puede si está PENDIENTE o CONFIRMADO.
     """
     es_cliente = "CLIENT" in current_user.roles and "ADMIN" not in current_user.roles
-    return svc.cancelar_pedido(pedido_id, current_user.id, es_cliente)
+    
+    # Cancela el pedido
+    pedido = svc.cancelar_pedido(pedido_id, current_user.id, es_cliente)
+    
+    await ws_manager.broadcast_pedido_update(
+        pedido_id=pedido.id,
+        usuario_id=pedido.usuario_id,
+        evento="pedido_cancelado",
+        estado_nuevo="CANCELADO"
+    )
+    
+    return pedido

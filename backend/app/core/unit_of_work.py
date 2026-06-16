@@ -24,3 +24,6 @@ class UnitOfWork:
 
     def rollback(self) -> None:
         self._session.rollback()
+
+    def flush(self) -> None:
+        self._session.flush()

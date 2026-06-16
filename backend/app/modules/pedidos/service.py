@@ -1,4 +1,3 @@
-# app/modules/pedidos/service.py
 from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlmodel import Session
@@ -87,7 +86,8 @@ class PedidoService:
             # 6. Audit Trail: Registrar paso a PENDIENTE
             historial = HistorialEstadoPedido(
                 pedido_id=nuevo_pedido.id,
-                estado_id=estado_inicial.id,
+                estado_desde=None,
+                estado_hacia=estado_inicial.codigo,
                 usuario_id=usuario_id
             )
             uow.historiales.add(historial)
@@ -118,7 +118,8 @@ class PedidoService:
             # Audit Trail: Insertar el registro del salto
             historial = HistorialEstadoPedido(
                 pedido_id=pedido.id,
-                estado_id=nuevo_estado.id,
+                estado_desde=estado_actual.codigo,
+                estado_hacia=nuevo_estado.codigo,
                 usuario_id=usuario_id
             )
             uow.historiales.add(historial)
@@ -146,13 +147,21 @@ class PedidoService:
             if estado_actual.codigo in ["ENTREGADO", "CANCELADO"]:
                 raise HTTPException(status_code=400, detail="El pedido ya finalizó su ciclo.")
 
+            # Reponer stock al cancelar el pedido
+            for detalle in pedido.detalles:
+                producto = uow.productos.get_by_id(detalle.producto_id)
+                if producto:
+                    producto.stock_cantidad += detalle.cantidad
+                    uow._session.add(producto)
+
             estado_cancelado = uow.estados.get_by_codigo("CANCELADO")
             pedido.estado_actual_id = estado_cancelado.id
             uow.pedidos.update(pedido)
 
             historial = HistorialEstadoPedido(
                 pedido_id=pedido.id,
-                estado_id=estado_cancelado.id,
+                estado_desde=estado_actual.codigo,
+                estado_hacia=estado_cancelado.codigo,
                 usuario_id=usuario_id
             )
             uow.historiales.add(historial)

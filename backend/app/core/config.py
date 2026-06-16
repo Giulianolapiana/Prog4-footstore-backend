@@ -1,5 +1,6 @@
 from pydantic import computed_field
 from pydantic_settings import BaseSettings
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -13,6 +14,21 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    cloudinary_cloud_name: str = ""
+    cloudinary_api_key: str = ""
+    cloudinary_api_secret: str = ""
+
+    MP_ACCESS_TOKEN:  Optional[str] = None
+    MP_PUBLIC_KEY:    Optional[str] = None
+    MP_WEBHOOK_URL:   Optional[str] = None
+    NGROK_URL:        Optional[str] = None
+
+    # --- CORS y Frontend ---
+    CORS_ORIGINS:       str = "http://localhost:5173"
+    VITE_FRONTEND_URL:  str = "http://localhost:5173"
+    VITE_API_URL:       str = "http://localhost:8000"
+
 
     @computed_field
     @property

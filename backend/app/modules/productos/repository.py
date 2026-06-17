@@ -17,7 +17,8 @@ class ProductoRepository(BaseRepository[Producto]):
         disponible: Optional[bool] = None,
         precio_min: Optional[Decimal] = None,
         precio_max: Optional[Decimal] = None,
-    ) -> List[Producto]:
+    ) -> tuple[List[Producto], int]:
+        from sqlmodel import func
         query = select(Producto).where(Producto.deleted_at.is_(None))
         if nombre:
             query = query.where(col(Producto.nombre).icontains(nombre))
@@ -27,9 +28,12 @@ class ProductoRepository(BaseRepository[Producto]):
             query = query.where(Producto.precio_base >= precio_min)
         if precio_max is not None:
             query = query.where(Producto.precio_base <= precio_max)
-        return self.session.exec(
+        
+        total = self.session.exec(select(func.count()).select_from(query.subquery())).one()
+        items = self.session.exec(
             query.order_by(Producto.nombre).offset(skip).limit(limit)
         ).all()
+        return items, total
 
     def get_categorias_links(self, producto_id: int) -> List[ProductoCategoria]:
         return self.session.exec(

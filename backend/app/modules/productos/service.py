@@ -11,9 +11,15 @@ class ProductoService:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def get_all(self, skip=0, limit=100, nombre=None, disponible=None, precio_min=None, precio_max=None) -> List[Producto]:
+    def get_all(self, skip=0, limit=100, nombre=None, disponible=None, precio_min=None, precio_max=None) -> dict:
         with ProductoUnitOfWork(self._session) as uow:
-            return uow.productos.search(skip, limit, nombre, disponible, precio_min, precio_max)
+            items, total = uow.productos.search(skip, limit, nombre, disponible, precio_min, precio_max)
+            return {
+                "items": items,
+                "total": total,
+                "page": (skip // limit) + 1 if limit > 0 else 1,
+                "size": limit
+            }
 
     def get_by_id(self, producto_id: int) -> Producto:
         with ProductoUnitOfWork(self._session) as uow:

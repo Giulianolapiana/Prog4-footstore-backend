@@ -176,14 +176,22 @@ class PaymentService:
             with PagoUnitOfWork(self._session) as uow:
                 pago = uow.pagos.get_by_mp_payment_id(int(pago_mp_id))
                 
-                if not pago and mp_info.get("mp_merchant_order_id"):
-                    pago = uow.pagos.get_by_mp_merchant_order_id(mp_info["mp_merchant_order_id"])
+                # NO usamos merchant_order_id como fallback porque MP agrupa reintentos del mismo external_reference 
+                # en la misma merchant_order, lo que causaba que el reintento hiciera match con el pago rechazado anterior.
 
                 if not pago and mp_info.get("mp_external_reference"):
                     # Si no lo encontramos por ID de MP, lo buscamos por el ID de nuestro pedido (external_reference)
                     try:
                         pedido_id_ext = int(mp_info["mp_external_reference"])
-                        pago = uow.pagos.get_ultimo_by_pedido(pedido_id_ext)
+                        pagos_del_pedido = uow.pagos.get_by_pedido(pedido_id_ext)
+                        # Buscar el primer intento pendiente sin ID de MP asignado
+                        for p in pagos_del_pedido:
+                            if p.mp_payment_id is None and p.estado == "pendiente":
+                                pago = p
+                                break
+                        # Si no hay, nos quedamos con el último
+                        if not pago and pagos_del_pedido:
+                            pago = pagos_del_pedido[0]
                     except (ValueError, TypeError):
                         pass
 

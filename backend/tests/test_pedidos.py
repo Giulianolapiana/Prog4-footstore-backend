@@ -27,7 +27,7 @@ def test_crear_pedido(client: TestClient, db_session: Session, client_cookies: d
     )
     assert res.status_code == 201, res.text
     data = res.json()
-    assert data["total"] == 1000.0
+    assert data["total"] == 1050.0
     
     db_session.refresh(producto)
     assert producto.stock_cantidad == 18

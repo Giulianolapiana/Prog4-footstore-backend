@@ -10,6 +10,7 @@ from app.modules.pedidos.models import Pedido, HistorialEstadoPedido
 from app.modules.pagos.models import Pago
 from app.modules.pagos.schemas import PagoCrearResponse, PagoEstadoResponse
 from app.modules.pagos.unit_of_work import PagoUnitOfWork
+from app.core.websocket import ws_manager
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,7 @@ class PaymentService:
                 public_key=self._get_mp_public_key(),
             )
 
-    def procesar_webhook(self, data: dict, query_params: Optional[dict] = None) -> Tuple[dict, Optional[int]]:
+    async def procesar_webhook(self, data: dict, query_params: Optional[dict] = None) -> Tuple[dict, Optional[int]]:
         logger.info("Webhook recibido: data=%s qs=%s", data, query_params or {})
 
         if not data and query_params:
@@ -213,6 +214,16 @@ class PaymentService:
                 if nuevo_estado == "aprobado":
                     self._confirmar_pedido_fsm(uow, pago.pedido_id)
 
+            # Si el webhook procesó con éxito un aprobado, alertamos reactivamente por WS
+            if nuevo_estado == "aprobado":
+                await ws_manager.broadcast_pedido_update(
+                    pedido_id=pago.pedido_id,
+                    usuario_id=None, # Origen sistema (IPN)
+                    evento="pago_confirmado",
+                    estado_nuevo="CONFIRMADO",
+                    estado_anterior="PENDIENTE"
+                )
+
             return {
                 "status": "processed",
                 "pago_id": pago.id,
@@ -224,7 +235,7 @@ class PaymentService:
             logger.exception("Error procesando webhook MP")
             return {"status": "error", "reason": str(e)}, None
 
-    def confirmar_pago(self, pedido_id: int, payment_id: Optional[int] = None) -> Tuple[PagoEstadoResponse, Optional[int]]:
+    async def confirmar_pago(self, pedido_id: int, payment_id: Optional[int] = None) -> Tuple[PagoEstadoResponse, Optional[int]]:
         pedido = self._session.get(Pedido, pedido_id)
         if not pedido:
             raise ValueError("Pedido no encontrado")
@@ -263,6 +274,15 @@ class PaymentService:
 
                     if nuevo_estado == "aprobado":
                         self._confirmar_pedido_fsm(uow, pedido_id)
+
+            if nuevo_estado == "aprobado":
+                await ws_manager.broadcast_pedido_update(
+                    pedido_id=pedido_id,
+                    usuario_id=None,
+                    evento="pago_confirmado",
+                    estado_nuevo="CONFIRMADO",
+                    estado_anterior="PENDIENTE"
+                )
 
             return PagoEstadoResponse(estado=nuevo_estado, pedido_id=pedido_id), pedido_id
 

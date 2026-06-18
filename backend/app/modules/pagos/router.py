@@ -5,7 +5,6 @@ from sqlmodel import Session
 
 from app.core.config import settings
 from app.core.database import get_session
-from app.core.websocket import ws_manager
 from app.modules.pagos.schemas import (
     CrearPagoRequest,
     ConfirmarPagoRequest,
@@ -49,17 +48,7 @@ async def webhook(
         else:
             data = dict(await request.form())
             
-        res, pedido_id = svc.procesar_webhook(data, query_params=query_params)
-        
-        # Si el webhook procesó con éxito un aprobado, alertamos reactivamente por WS
-        if res.get("status") == "processed" and res.get("estado") == "aprobado" and pedido_id:
-            await ws_manager.broadcast_pedido_update(
-                pedido_id=pedido_id,
-                usuario_id=None, # Origen sistema (IPN)
-                evento="pago_confirmado",
-                estado_nuevo="CONFIRMADO",
-                estado_anterior="PENDIENTE"
-            )
+        res, pedido_id = await svc.procesar_webhook(data, query_params=query_params)
         return res
     except Exception as e:
         logger.exception("Error en webhook MP")
@@ -71,16 +60,7 @@ async def confirm_payment(
     svc: PaymentService = Depends(get_payment_service),
 ):
     try:
-        res, pedido_id = svc.confirmar_pago(data.pedido_id, data.payment_id)
-        
-        if res.estado == "aprobado" and pedido_id:
-            await ws_manager.broadcast_pedido_update(
-                pedido_id=pedido_id,
-                usuario_id=None,
-                evento="pago_confirmado",
-                estado_nuevo="CONFIRMADO",
-                estado_anterior="PENDIENTE"
-            )
+        res, pedido_id = await svc.confirmar_pago(data.pedido_id, data.payment_id)
         return res
     except ValueError as e:
         if "no encontrado" in str(e).lower():
@@ -113,16 +93,7 @@ async def redirect_after_pago(
         try:
             from app.modules.pedidos.service import PedidoService
             pedido_svc = PedidoService(svc._session)
-            pedido_svc.cancelar_pedido(pedido_id=pedido_id, usuario_id=None, es_cliente=False)
-            
-            # Avisamos por WS que se canceló
-            await ws_manager.broadcast_pedido_update(
-                pedido_id=pedido_id,
-                usuario_id=None,
-                evento="estado_cambiado",
-                estado_nuevo="CANCELADO",
-                estado_anterior="PENDIENTE"
-            )
+            await pedido_svc.cancelar_pedido(pedido_id=pedido_id, usuario_id=None, es_cliente=False)
         except Exception as e:
             logger.error(f"Error al auto-cancelar el pedido fallido {pedido_id}: {e}")
     

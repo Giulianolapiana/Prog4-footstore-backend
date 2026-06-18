@@ -13,8 +13,12 @@ from app.modules.pedidos.models import EstadoPedido, FormaPago
 from app.modules.productos.models import Producto, UnidadMedida
 from app.modules.categorias.models import Categoria
 from app.modules.direcciones.models import DireccionEntrega
+from app.core.rate_limit.rate_limit_middleware import RateLimitMiddleware
 
 os.environ.setdefault("ENVIRONMENT", "test")
+# Aumentamos los límites durante los tests para que no bloqueen los flujos
+settings.rate_limit_auth_burst = 9999
+settings.rate_limit_default_burst = 9999
 
 # ===========================================================================
 # 1. ENGINE DE TEST
@@ -135,6 +139,7 @@ def client_fixture(db_session: Session):
         return db_session
 
     app.dependency_overrides[get_session] = get_session_override
+    RateLimitMiddleware.reset_all_limiters()
 
     with TestClient(app) as client:
         yield client

@@ -4,7 +4,8 @@
 VALID_TRANSITIONS: dict[str, list[str]] = {
     "PENDIENTE":   ["CONFIRMADO", "CANCELADO"],
     "CONFIRMADO":  ["EN_PREP", "CANCELADO"],
-    "EN_PREP":     ["ENTREGADO"],
+    "EN_PREP":     ["ENTREGADO", "EN_CAMINO"],
+    "EN_CAMINO":   ["ENTREGADO"],
     "ENTREGADO":   [],
     "CANCELADO":   [],
 }

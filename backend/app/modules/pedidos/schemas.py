@@ -38,18 +38,23 @@ class HistorialEstadoResponse(BaseModel):
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+from pydantic import BaseModel, ConfigDict, Field
+
 class DetallePedidoResponse(BaseModel):
     id: int
     producto_id: int
-    producto_nombre: str
-    producto_precio: float
+    producto_nombre: str = Field(validation_alias="nombre_snapshot")
+    producto_precio: float = Field(validation_alias="precio_snapshot")
     cantidad: int
-    subtotal: float
+    subtotal: float = Field(validation_alias="subtotal_snap")
     model_config = ConfigDict(from_attributes=True)
 
 class PedidoResponse(BaseModel):
     id: int
     usuario_id: int
+    subtotal: float
+    descuento: float
+    costo_envio: float
     total: float
     created_at: datetime
     estado_actual: EstadoPedidoResponse

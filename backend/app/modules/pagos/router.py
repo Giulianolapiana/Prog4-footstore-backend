@@ -88,14 +88,15 @@ async def redirect_after_pago(
     }
     front_status = status_map.get(status_mp, "error")
 
-    # Si el pago falló o fue cancelado por el usuario, cancelamos el pedido para liberar stock
-    if status_mp == "failure":
-        try:
-            from app.modules.pedidos.service import PedidoService
-            pedido_svc = PedidoService(svc._session)
-            await pedido_svc.cancelar_pedido(pedido_id=pedido_id, usuario_id=None, es_cliente=False)
-        except Exception as e:
-            logger.error(f"Error al auto-cancelar el pedido fallido {pedido_id}: {e}")
+    # Comentamos la auto-cancelación para que el pedido quede PENDIENTE
+    # y el usuario pueda ver el botón "Reintentar Pago" en el frontend.
+    # if status_mp == "failure":
+    #     try:
+    #         from app.modules.pedidos.service import PedidoService
+    #         pedido_svc = PedidoService(svc._session)
+    #         await pedido_svc.cancelar_pedido(pedido_id=pedido_id, usuario_id=None, es_cliente=False)
+    #     except Exception as e:
+    #         logger.error(f"Error al auto-cancelar el pedido fallido {pedido_id}: {e}")
     
     url = f"{frontend_url}/pago/{front_status}"
     

@@ -34,7 +34,7 @@ class EstadisticasService:
         resultados = self._repository.get_productos_top(limit)
         return [
             ProductoTopItem(
-                nombre=r.producto_nombre,
+                nombre=r.nombre_snapshot,
                 cantidad_vendida=r.cantidad_vendida,
                 ingresos=r.ingresos if r.ingresos else 0.0
             ) for r in resultados

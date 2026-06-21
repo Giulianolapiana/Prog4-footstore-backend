@@ -10,12 +10,22 @@ class IngredienteLink(BaseModel):
     ingrediente_id: int
     es_removible: bool = True
     es_opcional: bool = False
+    cantidad: Decimal = Field(..., gt=0)
+    unidad_medida_id: int = Field(...)
 
 class UnidadMedidaResponse(BaseModel):
     id: int
     nombre: str
     simbolo: str
     tipo: str
+    model_config = ConfigDict(from_attributes=True)
+
+class ProductoIngredienteResponse(BaseModel):
+    es_removible: bool
+    es_opcional: bool
+    cantidad: Decimal
+    unidad_medida: Optional[UnidadMedidaResponse] = None
+    ingrediente: IngredienteResponse
     model_config = ConfigDict(from_attributes=True)
 
 class ProductoBase(BaseModel):
@@ -52,7 +62,7 @@ class ProductoResponse(ProductoBase):
     created_at: datetime
     updated_at: datetime
     categorias: List[CategoriaResponse] = []
-    ingredientes: List[IngredienteResponse] = []
+    producto_ingredientes: List[ProductoIngredienteResponse] = []
     unidad_venta: Optional[UnidadMedidaResponse] = None
     stock_cantidad: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)

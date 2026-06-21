@@ -19,3 +19,9 @@ class Ingrediente(BaseEntity, table=True):
         back_populates="ingredientes",
         link_model=ProductoIngrediente 
     )
+    
+    # Nueva relación a la tabla pivot
+    producto_ingredientes: List["ProductoIngrediente"] = Relationship(
+        back_populates="ingrediente",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )

@@ -11,6 +11,15 @@ if TYPE_CHECKING:
     from app.modules.categorias.models import Categoria
     from app.modules.ingredientes.models import Ingrediente
 
+class UnidadMedida(BaseEntity, table=True):
+    __tablename__ = "unidad_medida"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    nombre: str = Field(max_length=50, nullable=False, unique=True)
+    simbolo: str = Field(max_length=10, nullable=False, unique=True)
+    tipo: str = Field(max_length=20, nullable=False) # peso, volumen, contable
+
+    productos: List["Producto"] = Relationship(back_populates="unidad_venta")
+
 class ProductoCategoria(SQLModel, table=True):
     __tablename__ = "producto_categoria"
     producto_id: int = Field(foreign_key="producto.id", primary_key=True)
@@ -37,6 +46,9 @@ class Producto(BaseEntity, table=True):
     imagenes_url: Optional[List[str]] = Field(default=[], sa_column=Column(JSON))
     disponible: bool = Field(default=True, nullable=False)
     
+    unidad_venta_id: Optional[int] = Field(default=None, foreign_key="unidad_medida.id")
+    unidad_venta: Optional[UnidadMedida] = Relationship(back_populates="productos")
+
     # Eliminamos created_at, updated_at y deleted_at porque BaseEntity ya los trae
 
     categorias: List["Categoria"] = Relationship(

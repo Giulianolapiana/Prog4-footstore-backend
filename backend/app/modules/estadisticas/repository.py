@@ -18,7 +18,14 @@ class EstadisticasRepository:
                 func.count(Pedido.id).label("cantidad_pedidos")
             )
             .join(EstadoPedido, Pedido.estado_actual_id == EstadoPedido.id)
+            .outerjoin(Pago, Pago.pedido_id == Pedido.id)
+            .join(FormaPago, FormaPago.id == Pedido.forma_pago_id)
             .where(EstadoPedido.codigo != "CANCELADO")
+            .where(
+                (Pago.mp_status == "approved") | 
+                (Pago.estado == "aprobado") | 
+                (FormaPago.codigo.in_(["EFECTIVO", "CREDIT", "DEBIT"]))
+            )
             .where(cast(Pedido.created_at, Date).between(desde, hasta))
             .group_by("periodo")
             .order_by("periodo")
@@ -28,15 +35,22 @@ class EstadisticasRepository:
     def get_productos_top(self, limit: int = 5) -> List[Tuple]:
         stmt = (
             select(
-                DetallePedido.producto_nombre,
-                func.sum(DetallePedido.subtotal).label("ingresos"),
+                DetallePedido.nombre_snapshot,
+                func.sum(DetallePedido.subtotal_snap).label("ingresos"),
                 func.sum(DetallePedido.cantidad).label("cantidad_vendida")
             )
             .join(Pedido)
             .join(EstadoPedido, Pedido.estado_actual_id == EstadoPedido.id)
+            .outerjoin(Pago, Pago.pedido_id == Pedido.id)
+            .join(FormaPago, FormaPago.id == Pedido.forma_pago_id)
             .where(EstadoPedido.codigo != "CANCELADO")
-            .group_by(DetallePedido.producto_nombre)
-            .order_by(func.sum(DetallePedido.subtotal).desc())
+            .where(
+                (Pago.mp_status == "approved") | 
+                (Pago.estado == "aprobado") | 
+                (FormaPago.codigo.in_(["EFECTIVO", "CREDIT", "DEBIT"]))
+            )
+            .group_by(DetallePedido.nombre_snapshot)
+            .order_by(func.sum(DetallePedido.subtotal_snap).desc())
             .limit(limit)
         )
         return self.session.exec(stmt).all()
@@ -62,7 +76,9 @@ class EstadisticasRepository:
             .where(EstadoPedido.codigo != "CANCELADO")
             .where(cast(Pedido.created_at, Date).between(desde, hasta))
             .where(
-                (Pago.mp_status == "approved") | (FormaPago.codigo == "EFECTIVO") | (Pago.estado == "aprobado")
+                (Pago.mp_status == "approved") | 
+                (Pago.estado == "aprobado") | 
+                (FormaPago.codigo.in_(["EFECTIVO", "CREDIT", "DEBIT"]))
             )
             .group_by(FormaPago.codigo)
         )
@@ -75,14 +91,28 @@ class EstadisticasRepository:
         ventas_hoy = self.session.exec(
             select(func.sum(Pedido.total))
             .join(EstadoPedido, Pedido.estado_actual_id == EstadoPedido.id)
+            .outerjoin(Pago, Pago.pedido_id == Pedido.id)
+            .join(FormaPago, FormaPago.id == Pedido.forma_pago_id)
             .where(EstadoPedido.codigo != "CANCELADO")
+            .where(
+                (Pago.mp_status == "approved") | 
+                (Pago.estado == "aprobado") | 
+                (FormaPago.codigo.in_(["EFECTIVO", "CREDIT", "DEBIT"]))
+            )
             .where(cast(Pedido.created_at, Date) == hoy)
         ).first() or Decimal('0.00')
 
         ticket_prom = self.session.exec(
             select(func.avg(Pedido.total))
             .join(EstadoPedido, Pedido.estado_actual_id == EstadoPedido.id)
+            .outerjoin(Pago, Pago.pedido_id == Pedido.id)
+            .join(FormaPago, FormaPago.id == Pedido.forma_pago_id)
             .where(EstadoPedido.codigo != "CANCELADO")
+            .where(
+                (Pago.mp_status == "approved") | 
+                (Pago.estado == "aprobado") | 
+                (FormaPago.codigo.in_(["EFECTIVO", "CREDIT", "DEBIT"]))
+            )
         ).first() or Decimal('0.00')
 
         pedidos_activos = self.session.exec(
@@ -94,7 +124,14 @@ class EstadisticasRepository:
         ventas_mes = self.session.exec(
             select(func.sum(Pedido.total))
             .join(EstadoPedido, Pedido.estado_actual_id == EstadoPedido.id)
+            .outerjoin(Pago, Pago.pedido_id == Pedido.id)
+            .join(FormaPago, FormaPago.id == Pedido.forma_pago_id)
             .where(EstadoPedido.codigo != "CANCELADO")
+            .where(
+                (Pago.mp_status == "approved") | 
+                (Pago.estado == "aprobado") | 
+                (FormaPago.codigo.in_(["EFECTIVO", "CREDIT", "DEBIT"]))
+            )
             .where(cast(Pedido.created_at, Date) >= inicio_mes)
         ).first() or Decimal('0.00')
 

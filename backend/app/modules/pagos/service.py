@@ -10,6 +10,7 @@ from app.modules.pedidos.models import Pedido, HistorialEstadoPedido
 from app.modules.pagos.models import Pago
 from app.modules.pagos.schemas import PagoCrearResponse, PagoEstadoResponse
 from app.modules.pagos.unit_of_work import PagoUnitOfWork
+from app.core.websocket import ws_manager
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,7 @@ class PaymentService:
                 "mp_status": response.get("status"),
                 "mp_status_detail": response.get("status_detail"),
                 "mp_merchant_order_id": response.get("merchant_order_id"),
+                "mp_external_reference": response.get("external_reference"),
             }
         except Exception as e:
             logger.exception("Error consultando pago MP %s", payment_id)
@@ -136,7 +138,7 @@ class PaymentService:
                 public_key=self._get_mp_public_key(),
             )
 
-    def procesar_webhook(self, data: dict, query_params: Optional[dict] = None) -> Tuple[dict, Optional[int]]:
+    async def procesar_webhook(self, data: dict, query_params: Optional[dict] = None) -> Tuple[dict, Optional[int]]:
         logger.info("Webhook recibido: data=%s qs=%s", data, query_params or {})
 
         if not data and query_params:
@@ -156,7 +158,7 @@ class PaymentService:
         if not pago_mp_id:
             return {"status": "ignored", "reason": "No payment ID"}, None
 
-        if topic not in (None, "payment", "merchant_order"):
+        if topic != "payment":
             return {"status": "ignored", "reason": f"Topic: {topic}"}, None
 
         try:
@@ -175,8 +177,24 @@ class PaymentService:
             with PagoUnitOfWork(self._session) as uow:
                 pago = uow.pagos.get_by_mp_payment_id(int(pago_mp_id))
                 
-                if not pago and mp_info.get("mp_merchant_order_id"):
-                    pago = uow.pagos.get_by_mp_merchant_order_id(mp_info["mp_merchant_order_id"])
+                # NO usamos merchant_order_id como fallback porque MP agrupa reintentos del mismo external_reference 
+                # en la misma merchant_order, lo que causaba que el reintento hiciera match con el pago rechazado anterior.
+
+                if not pago and mp_info.get("mp_external_reference"):
+                    # Si no lo encontramos por ID de MP, lo buscamos por el ID de nuestro pedido (external_reference)
+                    try:
+                        pedido_id_ext = int(mp_info["mp_external_reference"])
+                        pagos_del_pedido = uow.pagos.get_by_pedido(pedido_id_ext)
+                        # Buscar el primer intento pendiente sin ID de MP asignado
+                        for p in pagos_del_pedido:
+                            if p.mp_payment_id is None and p.estado == "pendiente":
+                                pago = p
+                                break
+                        # Si no hay, nos quedamos con el último
+                        if not pago and pagos_del_pedido:
+                            pago = pagos_del_pedido[0]
+                    except (ValueError, TypeError):
+                        pass
 
                 if not pago:
                     return {"status": "ignored", "reason": "Pago not found in local DB"}, None
@@ -196,6 +214,16 @@ class PaymentService:
                 if nuevo_estado == "aprobado":
                     self._confirmar_pedido_fsm(uow, pago.pedido_id)
 
+            # Si el webhook procesó con éxito un aprobado, alertamos reactivamente por WS
+            if nuevo_estado == "aprobado":
+                await ws_manager.broadcast_pedido_update(
+                    pedido_id=pago.pedido_id,
+                    usuario_id=None, # Origen sistema (IPN)
+                    evento="pago_confirmado",
+                    estado_nuevo="CONFIRMADO",
+                    estado_anterior="PENDIENTE"
+                )
+
             return {
                 "status": "processed",
                 "pago_id": pago.id,
@@ -207,7 +235,7 @@ class PaymentService:
             logger.exception("Error procesando webhook MP")
             return {"status": "error", "reason": str(e)}, None
 
-    def confirmar_pago(self, pedido_id: int, payment_id: Optional[int] = None) -> Tuple[PagoEstadoResponse, Optional[int]]:
+    async def confirmar_pago(self, pedido_id: int, payment_id: Optional[int] = None) -> Tuple[PagoEstadoResponse, Optional[int]]:
         pedido = self._session.get(Pedido, pedido_id)
         if not pedido:
             raise ValueError("Pedido no encontrado")
@@ -247,6 +275,15 @@ class PaymentService:
                     if nuevo_estado == "aprobado":
                         self._confirmar_pedido_fsm(uow, pedido_id)
 
+            if nuevo_estado == "aprobado":
+                await ws_manager.broadcast_pedido_update(
+                    pedido_id=pedido_id,
+                    usuario_id=None,
+                    evento="pago_confirmado",
+                    estado_nuevo="CONFIRMADO",
+                    estado_anterior="PENDIENTE"
+                )
+
             return PagoEstadoResponse(estado=nuevo_estado, pedido_id=pedido_id), pedido_id
 
         # Si llegamos acá es porque no hay payment_id ni en la BD ni en el request
@@ -273,6 +310,8 @@ class PaymentService:
 
         estado_confirmado = uow.estados.get_by_codigo("CONFIRMADO")
         if estado_confirmado:
+            estado_anterior_codigo = estado_actual.codigo if estado_actual else "PENDIENTE"
+            
             # 1. Actualiza la cabecera
             pedido.estado_actual_id = estado_confirmado.id
             pedido.updated_at = datetime.now(timezone.utc)
@@ -281,8 +320,7 @@ class PaymentService:
             # 2. Audit trail append-only (Obligatorio en v6.0)
             uow.historiales.add(HistorialEstadoPedido(
                 pedido_id=pedido.id,
-                estado_id=estado_confirmado.id,
-                # Asumimos que el usuario que realizó la acción original es el dueño
-                # o pasamos None porque fue una acción automatizada del sistema.
+                estado_desde=estado_anterior_codigo,
+                estado_hacia="CONFIRMADO",
                 usuario_id=pedido.usuario_id 
             ))

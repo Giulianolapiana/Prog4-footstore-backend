@@ -25,8 +25,10 @@ LimitDep   = Annotated[int, Query(ge=1, le=100)]
 def get_producto_service(session: SessionDep) -> ProductoService:
     return ProductoService(session)
 
+from app.core.pagination import PaginatedResponse
+
 # PÚBLICO: Los clientes necesitan ver el catálogo
-@router.get("/", response_model=List[ProductoResponse])
+@router.get("/", response_model=PaginatedResponse[ProductoResponse])
 def get_productos(
     skip: SkipDep = 0,
     limit: LimitDep = 20,

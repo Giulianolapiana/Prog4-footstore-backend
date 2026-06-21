@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     VITE_FRONTEND_URL:  str = "http://localhost:5173"
     VITE_API_URL:       str = "http://localhost:8000"
 
+    # Logging
+    LOG_LEVEL: str = "INFO"
+
+    # Rate Limiting
+    rate_limit_default_burst: int = 100
+    rate_limit_default_per_minute: int = 60
+    rate_limit_auth_burst: int = 20
+    rate_limit_auth_per_minute: int = 5
+
 
     @computed_field
     @property

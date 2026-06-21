@@ -15,6 +15,7 @@ SessionDep = Annotated[Session, Depends(get_session)]
 def get_auth_service(session: SessionDep) -> AuthService:
     return AuthService(session)
 
+# ...
 @router.post("/register", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED)
 def register(data: UsuarioCreate, svc: AuthService = Depends(get_auth_service)):
     return svc.register(data)

@@ -3,6 +3,8 @@ from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime, timezone
 from sqlmodel import Field, SQLModel, Relationship
 from app.core.base_model import BaseEntity
+from decimal import Decimal
+from sqlalchemy import Column, DECIMAL
 
 if TYPE_CHECKING:
     from app.modules.auth.models import Usuario
@@ -43,11 +45,11 @@ class DetallePedido(BaseEntity, table=True):
     producto_id: int = Field(foreign_key="producto.id")
     
     # Snapshot Pattern — inmutables
-    producto_nombre: str = Field(nullable=False)
-    producto_precio: float = Field(nullable=False)
+    nombre_snapshot: str = Field(nullable=False)
+    precio_snapshot: Decimal = Field(sa_column=Column(DECIMAL(10, 2), nullable=False), ge=0)
     
     cantidad: int = Field(nullable=False, gt=0)
-    subtotal: float = Field(nullable=False)
+    subtotal_snap: Decimal = Field(sa_column=Column(DECIMAL(10, 2), nullable=False), ge=0)
 
     pedido: "Pedido" = Relationship(back_populates="detalles")
     producto: "Producto" = Relationship()
@@ -59,7 +61,10 @@ class Pedido(BaseEntity, table=True):
     estado_actual_id: int = Field(foreign_key="estado_pedido.id")
     forma_pago_id: int = Field(foreign_key="forma_pago.id")
     direccion_entrega_id: int = Field(foreign_key="direccion_entrega.id")
-    total: float = Field(nullable=False, ge=0)
+    subtotal: Decimal = Field(sa_column=Column(DECIMAL(10, 2), nullable=False), ge=0)
+    descuento: Decimal = Field(sa_column=Column(DECIMAL(10, 2), default=0.00), ge=0)
+    costo_envio: Decimal = Field(sa_column=Column(DECIMAL(10, 2), default=50.00), ge=0)
+    total: Decimal = Field(sa_column=Column(DECIMAL(10, 2), nullable=False), ge=0)
 
     # Relaciones
     usuario: "Usuario" = Relationship()

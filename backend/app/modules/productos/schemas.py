@@ -11,11 +11,19 @@ class IngredienteLink(BaseModel):
     es_removible: bool = True
     es_opcional: bool = False
 
+class UnidadMedidaResponse(BaseModel):
+    id: int
+    nombre: str
+    simbolo: str
+    tipo: str
+    model_config = ConfigDict(from_attributes=True)
+
 class ProductoBase(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=150)
     descripcion: Optional[str] = Field(default=None, max_length=500)
     precio_base: Decimal = Field(..., gt=0, decimal_places=2)
     stock_cantidad: Optional[int] = Field(default=None, ge=0)
+    unidad_venta_id: int = Field(...)
     imagenes_url: Optional[List[str]] = []
     disponible: bool = True
 
@@ -29,6 +37,7 @@ class ProductoUpdate(BaseModel):
     descripcion: Optional[str] = Field(default=None, max_length=500)
     precio_base: Optional[Decimal] = Field(default=None, gt=0, decimal_places=2)
     stock_cantidad: Optional[int] = Field(default=None, ge=0)
+    unidad_venta_id: Optional[int] = Field(default=None)
     imagenes_url: Optional[List[str]] = None
     disponible: Optional[bool] = None
     categoria_ids: Optional[List[int]] = Field(default=None, min_length=1)
@@ -44,5 +53,6 @@ class ProductoResponse(ProductoBase):
     updated_at: datetime
     categorias: List[CategoriaResponse] = []
     ingredientes: List[IngredienteResponse] = []
+    unidad_venta: Optional[UnidadMedidaResponse] = None
     stock_cantidad: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)

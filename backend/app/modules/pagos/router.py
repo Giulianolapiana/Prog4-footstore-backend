@@ -5,7 +5,6 @@ from sqlmodel import Session
 
 from app.core.config import settings
 from app.core.database import get_session
-from app.core.websocket import ws_manager
 from app.modules.pagos.schemas import (
     CrearPagoRequest,
     ConfirmarPagoRequest,
@@ -49,17 +48,7 @@ async def webhook(
         else:
             data = dict(await request.form())
             
-        res, pedido_id = svc.procesar_webhook(data, query_params=query_params)
-        
-        # Si el webhook procesó con éxito un aprobado, alertamos reactivamente por WS
-        if res.get("status") == "processed" and res.get("estado") == "aprobado" and pedido_id:
-            await ws_manager.broadcast_pedido_update(
-                pedido_id=pedido_id,
-                usuario_id=None, # Origen sistema (IPN)
-                evento="pago_confirmado",
-                estado_nuevo="CONFIRMADO",
-                estado_anterior="PENDIENTE"
-            )
+        res, pedido_id = await svc.procesar_webhook(data, query_params=query_params)
         return res
     except Exception as e:
         logger.exception("Error en webhook MP")
@@ -71,16 +60,7 @@ async def confirm_payment(
     svc: PaymentService = Depends(get_payment_service),
 ):
     try:
-        res, pedido_id = svc.confirmar_pago(data.pedido_id, data.payment_id)
-        
-        if res.estado == "aprobado" and pedido_id:
-            await ws_manager.broadcast_pedido_update(
-                pedido_id=pedido_id,
-                usuario_id=None,
-                evento="pago_confirmado",
-                estado_nuevo="CONFIRMADO",
-                estado_anterior="PENDIENTE"
-            )
+        res, pedido_id = await svc.confirmar_pago(data.pedido_id, data.payment_id)
         return res
     except ValueError as e:
         if "no encontrado" in str(e).lower():
@@ -91,10 +71,42 @@ async def confirm_payment(
 
 
 @router.get("/redirect/{pedido_id}/{status_mp}")
-async def redirect_after_pago(pedido_id: int, status_mp: str, request: Request):
+async def redirect_after_pago(
+    pedido_id: int, 
+    status_mp: str, 
+    request: Request,
+    svc: PaymentService = Depends(get_payment_service)
+):
     frontend_url = settings.VITE_FRONTEND_URL
     qs = request.url.query
-    url = f"{frontend_url}/orders/{pedido_id}/{status_mp}"
+    
+    # Mapeo de estados de MercadoPago a los estados del frontend
+    status_map = {
+        "success": "exito",
+        "failure": "error",
+        "pending": "pendiente"
+    }
+    front_status = status_map.get(status_mp, "error")
+
+    # Comentamos la auto-cancelación para que el pedido quede PENDIENTE
+    # y el usuario pueda ver el botón "Reintentar Pago" en el frontend.
+    # if status_mp == "failure":
+    #     try:
+    #         from app.modules.pedidos.service import PedidoService
+    #         pedido_svc = PedidoService(svc._session)
+    #         await pedido_svc.cancelar_pedido(pedido_id=pedido_id, usuario_id=None, es_cliente=False)
+    #     except Exception as e:
+    #         logger.error(f"Error al auto-cancelar el pedido fallido {pedido_id}: {e}")
+    
+    url = f"{frontend_url}/pago/{front_status}"
+    
+    # Asegurar que external_reference esté presente para la confirmación proactiva
     if qs:
-        url += f"?{qs}"
+        if "external_reference" not in qs:
+            url += f"?{qs}&external_reference={pedido_id}"
+        else:
+            url += f"?{qs}"
+    else:
+        url += f"?external_reference={pedido_id}"
+        
     return RedirectResponse(url=url)

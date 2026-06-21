@@ -4,6 +4,7 @@ from app.core.security import hash_password
 from app.modules.auth.models import Rol, Usuario, UsuarioRol
 # Importá tus modelos de pedidos (asegurate de tenerlos creados con estos nombres o ajustalos luego)
 from app.modules.pedidos.models import EstadoPedido, FormaPago
+from app.modules.productos.models import UnidadMedida
 
 def run_seed():
     """Ejecuta la carga de datos iniciales en la base de datos."""
@@ -31,7 +32,6 @@ def run_seed():
                 EstadoPedido(codigo="PENDIENTE", nombre="Pendiente"),
                 EstadoPedido(codigo="CONFIRMADO", nombre="Confirmado"),
                 EstadoPedido(codigo="EN_PREP", nombre="En Preparación"),
-                EstadoPedido(codigo="EN_CAMINO", nombre="En Camino"),
                 EstadoPedido(codigo="ENTREGADO", nombre="Entregado"),
                 EstadoPedido(codigo="CANCELADO", nombre="Cancelado"),
             ]
@@ -40,12 +40,22 @@ def run_seed():
         # 4. Cargar Formas de Pago
         if not session.exec(select(FormaPago)).first():
             formas = [
-                FormaPago(codigo="CASH", nombre="Efectivo"),
+                FormaPago(codigo="EFECTIVO", nombre="Efectivo"),
                 FormaPago(codigo="DEBIT", nombre="Tarjeta de Débito"),
                 FormaPago(codigo="CREDIT", nombre="Tarjeta de Crédito"),
-                FormaPago(codigo="MP", nombre="MercadoPago"),
+                FormaPago(codigo="MERCADOPAGO", nombre="MercadoPago"),
             ]
             session.add_all(formas)
+
+        # 4.5 Cargar Unidades de Medida
+        if not session.exec(select(UnidadMedida)).first():
+            unidades = [
+                UnidadMedida(nombre="Kilogramo", simbolo="kg", tipo="peso"),
+                UnidadMedida(nombre="Gramo", simbolo="g", tipo="peso"),
+                UnidadMedida(nombre="Unidad", simbolo="ud", tipo="contable"),
+                UnidadMedida(nombre="Litro", simbolo="l", tipo="volumen"),
+            ]
+            session.add_all(unidades)
 
         # 5. Crear Usuario Admin por defecto
         admin_user = Usuario(

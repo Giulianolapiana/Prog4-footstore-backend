@@ -8,6 +8,13 @@ from app.modules.seed.seed import run_seed
 from app.core.cloudinary_setup import init_cloudinary
 from app.modules.uploads.router import router as router_uploads
 
+# Core Features
+from app.core.logger import setup_logging
+from app.core.exceptions.exception_handlers import register_exception_handlers
+from app.core.middleware.logging_middleware import LoggingMiddleware
+from app.core.middleware.timing_middleware import TimingMiddleware
+from app.core.rate_limit.rate_limit_middleware import RateLimitMiddleware
+
 # Routers modulares
 from app.modules.categorias.router import router as router_categorias
 from app.modules.ingredientes.router import router as router_ingredientes
@@ -23,6 +30,7 @@ from app.modules.pagos.router import router as router_pagos
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    setup_logging()  # Configurar logger al inicio
     create_db_and_tables()
     run_seed()
     init_cloudinary()
@@ -41,6 +49,14 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Exception Handlers
+register_exception_handlers(app)
+
+# Middlewares (se ejecutan en orden inverso al que se añaden, el último añadido es el más exterior)
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(TimingMiddleware)
+app.add_middleware(LoggingMiddleware)
 
 # CORS 
 
@@ -71,43 +87,6 @@ app.include_router(router_ws_pedidos)
 app.include_router(router_uploads, prefix="/api/v1")
 app.include_router(router_pagos, prefix="/api/v1")
 
-#  Manejador de errores de validación de Pydantic 
-# Traduce los mensajes automáticos de FastAPI al español
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    errors = []
-    for error in exc.errors():
-        err_type = error.get("type")
-        message = error.get("msg")
-
-        # Mapeo de errores comunes → español
-        if err_type == "missing":
-            message = "Este campo es obligatorio"
-        elif err_type == "string_too_long":
-            ctx = error.get("ctx", {})
-            limit = ctx.get("max_length") or ctx.get("limit_value") or 150
-            message = f"El texto es demasiado largo (máximo {limit} caracteres)"
-        elif err_type == "string_too_short":
-            ctx = error.get("ctx", {})
-            limit = ctx.get("min_length") or ctx.get("limit_value") or 2
-            message = f"El texto es demasiado corto (mínimo {limit} caracteres)"
-        elif "greater_than" in (err_type or ""):
-            limit = error.get("ctx", {}).get("limit_value") or error.get("ctx", {}).get("gt")
-            message = f"El valor debe ser mayor a {limit}"
-        elif "less_than" in (err_type or ""):
-            limit = error.get("ctx", {}).get("limit_value") or error.get("ctx", {}).get("lt")
-            message = f"El valor debe ser menor a {limit}"
-
-        errors.append({
-            "loc": error.get("loc"),
-            "msg": message,
-            "type": err_type,
-        })
-
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": errors},
-    )
 
 # ── Endpoint de control ───────────────────────────────────────────────────────
 @app.get("/", tags=["Root"], summary="Health check")

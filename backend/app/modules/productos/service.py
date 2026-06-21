@@ -114,5 +114,7 @@ class ProductoService:
                 ingrediente_id=ing_link.ingrediente_id,
                 es_removible=ing_link.es_removible,
                 es_opcional=ing_link.es_opcional,
+                cantidad=ing_link.cantidad,
+                unidad_medida_id=ing_link.unidad_medida_id
             )
             uow.productos.session.add(link)

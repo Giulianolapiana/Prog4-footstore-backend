@@ -33,6 +33,13 @@ class ProductoIngrediente(SQLModel, table=True):
     ingrediente_id: int = Field(foreign_key="ingrediente.id", primary_key=True)
     es_removible: bool = Field(default=True, nullable=False)
     es_opcional: bool = Field(default=False, nullable=False)
+    cantidad: Decimal = Field(sa_column=Column(DECIMAL(10,3), nullable=False, server_default="1.000"), ge=0)
+    unidad_medida_id: int = Field(foreign_key="unidad_medida.id", nullable=False, default=3)
+
+    # Relaciones explícitas hacia Producto e Ingrediente y UnidadMedida
+    producto: "Producto" = Relationship(back_populates="producto_ingredientes")
+    ingrediente: "Ingrediente" = Relationship(back_populates="producto_ingredientes")
+    unidad_medida: Optional["UnidadMedida"] = Relationship()
 
 # Hereda de BaseEntity para tener created_at, updated_at y deleted_at automáticamente
 class Producto(BaseEntity, table=True):
@@ -55,7 +62,13 @@ class Producto(BaseEntity, table=True):
         back_populates="productos",
         link_model=ProductoCategoria
     )
+    # Mantenemos ingredientes por compatibilidad si se requiere
     ingredientes: List["Ingrediente"] = Relationship(
         back_populates="productos",
         link_model=ProductoIngrediente
+    )
+    # Nueva relación a la tabla pivot para acceder a los campos extra
+    producto_ingredientes: List["ProductoIngrediente"] = Relationship(
+        back_populates="producto",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )

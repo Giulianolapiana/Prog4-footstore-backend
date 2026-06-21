@@ -108,7 +108,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         # Logueamos el request entrante. Usamos %s para que el logging
         # formatee lazy (más eficiente que f-strings).
         logger.info(
-            "→ %s %s [id=%s] from=%s ua=%s",
+            "-> %s %s [id=%s] from=%s ua=%s",
             request.method,
             request.url.path,
             request_id,
@@ -126,7 +126,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             # (caso raro). Loggeamos con nivel ERROR.
             duration_ms = (time.perf_counter() - start_time) * 1000
             logger.error(
-                "✗ %s %s [id=%s] EXCEPTION after %.1fms: %s",
+                "x %s %s [id=%s] EXCEPTION after %.1fms: %s",
                 request.method,
                 request.url.path,
                 request_id,
@@ -150,7 +150,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             log_level = logger.info
 
         log_level(
-            "← %s %s [id=%s] %d in %.1fms",
+            "<- %s %s [id=%s] %d in %.1fms",
             request.method,
             request.url.path,
             request_id,

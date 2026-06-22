@@ -48,3 +48,18 @@ class ProductoRepository(BaseRepository[Producto]):
                 ProductoIngrediente.producto_id == producto_id
             )
         ).all()
+
+    def get_by_nombre(self, nombre: str) -> Optional[Producto]:
+        return self.session.exec(select(Producto).where(Producto.nombre == nombre)).first()
+
+    def add_categoria_link(self, link: ProductoCategoria) -> None:
+        self.session.add(link)
+
+    def add_ingrediente_link(self, link: ProductoIngrediente) -> None:
+        self.session.add(link)
+
+    def delete_categoria_link(self, link: ProductoCategoria) -> None:
+        self.session.delete(link)
+
+    def delete_ingrediente_link(self, link: ProductoIngrediente) -> None:
+        self.session.delete(link)
